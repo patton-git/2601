@@ -1,0 +1,52 @@
+---
+- name: Configure NIC Teaming, VLAN NICs, IPs, IPv6 binding, Firewall on Windows and FQDN
+  hosts: dc
+  gather_facts: no
+  vars:
+    DNS_Records:
+      - { name: loginsight, ip: 10.10.10.9 }
+      - { name: sa-vcsa-01, ip: 10.10.10.10 }
+      - { name: sa-esxi-01, ip: 10.10.10.11 }
+      - { name: sa-esxi-02, ip: 10.10.10.12 }
+      - { name: sa-esxi-03, ip: 10.10.10.13 }
+
+  tasks:
+    - name: Add Forward DNS records
+      community.windows.win_dns_record:
+        state: present
+        name: "{{ item.name }}"
+        type: "A"
+        value: "{{ item.ip }}"
+        zone: "vclass.local"
+      loop: "{{ DNS_Records }}"
+
+    - name: Add Reverse DNS records
+      community.windows.win_dns_record:
+        state: present
+        name: "{{ item.ip.split('.')[-1] }}"
+        type: "PTR"
+        value: "{{ item.name}}.vclass.local"
+        zone: "10.10.10.in-addr.arpa"
+      loop: "{{ DNS_Records }}"
+
+    - name: Execute original PowerShell script
+      ansible.windows.win_powershell:
+        script: |
+          New-NetLbfoTeam -Name "LabVlan" -TeamMembers "Ethernet2" -TeamingMode SwitchIndependent -LoadBalancingAlgorithm Transport -confirm:$false
+
+          Add-NetLbfoTeamNic -Team "LabVlan" -VlanID 11 -Name "VLAN11" -confirm:$false
+          Add-NetLbfoTeamNic -Team "LabVlan" -VlanID 12 -Name "VLAN12" -confirm:$false
+          Add-NetLbfoTeamNic -Team "LabVlan" -VlanID 13 -Name "VLAN13" -confirm:$false
+
+          New-NetIPAddress -InterfaceAlias "VLAN11" -IPAddress 10.10.11.1 -PrefixLength 24
+          New-NetIPAddress -InterfaceAlias "VLAN12" -IPAddress 10.10.12.1 -PrefixLength 24
+          New-NetIPAddress -InterfaceAlias "VLAN13" -IPAddress 10.10.13.1 -PrefixLength 24
+
+          Disable-NetAdapterBinding -Name "*" -ComponentID ms_tcpip6
+
+          New-NetFirewallRule -DisplayName "Allow inbound ICMPv4" -Protocol ICMPv4 -IcmpType 8 -Direction Inbound -Action Allow -Enabled True -Profile Any
+
+          netsh routing ip nat add interface "VLAN13" private
+          Restart-Service -Name RemoteAccess -Force
+      ignore_errors: no
+
