@@ -14,16 +14,16 @@
     snapshot_name: "Setup"
 
     LAB_SID: 
-    - { id: S00, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp-DC: Temp-WinSvr-ESX-01, Temp-Desktop: Temp-Desktop-ESX-01 }
-    - { id: S01, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp-DC: Temp-WinSvr-ESX-01, Temp-Desktop: Temp-Desktop-ESX-01 }
-    - { id: S02, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp-DC: Temp-WinSvr-ESX-01, Temp-Desktop: Temp-Desktop-ESX-01 }
-    - { id: S03, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp-DC: Temp-WinSvr-ESX-01, Temp-Desktop: Temp-Desktop-ESX-01 }
-    - { id: S04, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp-DC: Temp-WinSvr-ESX-01, Temp-Desktop: Temp-Desktop-ESX-01 }
-    - { id: S05, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp-DC: Temp-WinSvr-ESX-02, Temp-Desktop: Temp-Desktop-ESX-02 }
-    - { id: S06, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp-DC: Temp-WinSvr-ESX-02, Temp-Desktop: Temp-Desktop-ESX-02 }
-    - { id: S07, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp-DC: Temp-WinSvr-ESX-02, Temp-Desktop: Temp-Desktop-ESX-02 }
-    - { id: S08, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp-DC: Temp-WinSvr-ESX-02, Temp-Desktop: Temp-Desktop-ESX-02 }
-    - { id: S09, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp-DC: Temp-WinSvr-ESX-02, Temp-Desktop: Temp-Desktop-ESX-02 }
+    - { id: S00, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_DC: Temp-WinSvr-ESX-01, Temp_Desktop: Temp-Desktop-ESX-01 }
+    - { id: S01, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_DC: Temp-WinSvr-ESX-01, Temp_Desktop: Temp-Desktop-ESX-01 }
+    - { id: S02, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_DC: Temp-WinSvr-ESX-01, Temp_Desktop: Temp-Desktop-ESX-01 }
+    - { id: S03, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_DC: Temp-WinSvr-ESX-01, Temp_Desktop: Temp-Desktop-ESX-01 }
+    - { id: S04, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_DC: Temp-WinSvr-ESX-01, Temp_Desktop: Temp-Desktop-ESX-01 }
+    - { id: S05, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_DC: Temp-WinSvr-ESX-02, Temp_Desktop: Temp-Desktop-ESX-02 }
+    - { id: S06, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_DC: Temp-WinSvr-ESX-02, Temp_Desktop: Temp-Desktop-ESX-02 }
+    - { id: S07, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_DC: Temp-WinSvr-ESX-02, Temp_Desktop: Temp-Desktop-ESX-02 }
+    - { id: S08, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_DC: Temp-WinSvr-ESX-02, Temp_Desktop: Temp-Desktop-ESX-02 }
+    - { id: S09, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_DC: Temp-WinSvr-ESX-02, Temp_Desktop: Temp-Desktop-ESX-02 }
 
     LAB_PGs:
     - { name: -Trunk,   vid: 4095 }
@@ -106,7 +106,7 @@
       folder: "{{ parent_folder }}{{ item.id }}"
       esxi_hostname: "{{ item.host }}"
       datastore: "{{ item.ds }}"
-      template: "{{ item.Temp-DC }}"
+      template: "{{ item.Temp_DC }}"
       linked_clone: True
       snapshot_src: "{{ snapshot_name }}"
     loop: "{{ LAB_SID }}"
@@ -156,7 +156,7 @@
       folder: "{{ parent_folder }}{{ item.id }}"
       esxi_hostname: "{{ item.host }}"
       datastore: "{{ item.ds }}"
-      template: "{{ item.Temp-Desktop}}"
+      template: "{{ item.Temp_Desktop}}"
       linked_clone: True
       snapshot_src: "{{ snapshot_name }}"
     loop: "{{ LAB_SID }}"
