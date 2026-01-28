@@ -28,11 +28,17 @@
         replication_scope: "Domain" # AD 통합 존으로 생성
         state: present
 
-    - name: Ensure DNS Reverse Zone exists
-      community.windows.win_dns_zone:
-        name: "{{ reverse_zone }}"
-        replication_scope: "Domain"
-        state: present
+# win_dns_zone 모듈 에러 방지를 위해 PowerShell로 역방향 존 생성 확인 및 추가
+    - name: Ensure DNS Reverse Zone exists (using PowerShell)
+      ansible.windows.win_shell: |
+        $zone = "{{ reverse_zone }}"
+        if (!(Get-DnsServerZone -Name $zone -ErrorAction SilentlyContinue)) {
+            Add-DnsServerPrimaryZone -Name $zone -ReplicationScope Domain
+            exit 100 # 변경 사항이 있음을 Ansible에 알림
+        }
+      register: reverse_zone_creation
+      changed_when: reverse_zone_creation.rc == 100
+      failed_when: reverse_zone_creation.rc != 0 and reverse_zone_creation.rc != 100
 
     - name: Add Forward DNS records (A Record)
       community.windows.win_dns_record:
