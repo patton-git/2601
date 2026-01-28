@@ -1,0 +1,53 @@
+---
+- name: Manage AD DNS Zones and Records
+  hosts: dc_dns
+  gather_facts: no
+  vars:
+    # 정방향 및 역방향 존 이름 정의
+    forward_zone: "vclass.local"
+    reverse_zone: "15.10.10.in-addr.arpa"
+
+    # FQDN 및 IP 리스트
+    DNS_Records:
+      - { fqdn: "prod-k8s-api.vclass.local", ip: "10.10.15.10" }
+      - { fqdn: "prod-k8s-api-proxy01.vclass.local", ip: "10.10.15.11" }
+      - { fqdn: "prod-k8s-api-proxy02.vclass.local", ip: "10.10.15.12" }
+      - { fqdn: "prod-k8s-cp-01.vclass.local", ip: "10.10.15.21" }
+      - { fqdn: "prod-k8s-cp-02.vclass.local", ip: "10.10.15.22" }
+      - { fqdn: "prod-k8s-cp-03.vclass.local", ip: "10.10.15.23" }
+      - { fqdn: "prod-k8s-worker-01.vclass.local", ip: "10.10.15.31" }
+      - { fqdn: "prod-k8s-worker-02.vclass.local", ip: "10.10.15.32" }
+      - { fqdn: "prod-k8s-worker-03.vclass.local", ip: "10.10.15.33" }
+
+  tasks:
+    - name: Ensure DNS Forward Zone exists
+      community.windows.win_dns_zone:
+        name: "{{ forward_zone }}"
+        replication_scope: "Domain" # AD 통합 존으로 생성
+        state: present
+
+    - name: Ensure DNS Reverse Zone exists
+      community.windows.win_dns_zone:
+        name: "{{ reverse_zone }}"
+        replication_scope: "Domain"
+        state: present
+
+    - name: Add Forward DNS records (A Record)
+      community.windows.win_dns_record:
+        state: present
+        # FQDN에서 호스트 이름만 추출 (예: prod-k8s-api)
+        name: "{{ item.fqdn.split('.')[0] }}"
+        type: "A"
+        value: "{{ item.ip }}"
+        zone: "{{ forward_zone }}"
+      loop: "{{ DNS_Records }}"
+
+    - name: Add Reverse DNS records (PTR Record)
+      community.windows.win_dns_record:
+        state: present
+        # IP의 마지막 옥텟을 추출 (예: 10)
+        name: "{{ item.ip.split('.')[-1] }}"
+        type: "PTR"
+        value: "{{ item.fqdn }}"
+        zone: "{{ reverse_zone }}"
+      loop: "{{ DNS_Records }}"
