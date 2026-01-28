@@ -2,6 +2,8 @@
 - name: Manage AD DNS Zones and Records
   hosts: dc_dns
   gather_facts: no
+  become: yes
+  become_method: runas  
   vars:
     # 정방향 및 역방향 존 이름 정의
     forward_zone: "vclass.local"
