@@ -3,7 +3,9 @@
   hosts: dc_dns
   gather_facts: no
   become: yes
-  become_method: runas  
+  become_method: runas
+  become_user: administrator
+  
   vars:
     # 정방향 및 역방향 존 이름 정의
     forward_zone: "vclass.local"
@@ -25,7 +27,7 @@
     - name: Ensure DNS Forward Zone exists
       community.windows.win_dns_zone:
         name: "{{ forward_zone }}"
-        replication_scope: "Domain" # AD 통합 존으로 생성
+        replication: "Domain" # AD 통합 존으로 생성
         state: present
 
 # win_dns_zone 모듈 에러 방지를 위해 PowerShell로 역방향 존 생성 확인 및 추가
