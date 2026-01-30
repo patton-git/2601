@@ -30,14 +30,14 @@
     - { name: -Mgmt,    vid:   10 }
 
     LAB_VMs:
-    - { name: prod-k8s-api-proxy01 }
-    - { name: prod-k8s-api-proxy02 }
-    - { name: prod-k8s-cp-01 }
-    - { name: prod-k8s-cp-02 }
-    - { name: prod-k8s-cp-03 }
-    - { name: prod-k8s-worker-01 }
-    - { name: prod-k8s-worker-02 }
-    - { name: prod-k8s-worker-03 }
+    - { name: prod-k8s-api-proxy01, pg: -Prod, ip: 10.10.15.11 }
+    - { name: prod-k8s-api-proxy02, pg: -Prod, ip: 10.10.15.12 }
+    - { name: prod-k8s-cp-01, pg: -Prod, ip: 10.10.15.21 }
+    - { name: prod-k8s-cp-02, pg: -Prod, ip: 10.10.15.22 }
+    - { name: prod-k8s-cp-03, pg: -Prod, ip: 10.10.15.23 }
+    - { name: prod-k8s-worker-01, pg: -Prod, ip: 10.10.15.31 }
+    - { name: prod-k8s-worker-02, pg: -Prod, ip: 10.10.15.32 }
+    - { name: prod-k8s-worker-03, pg: -Prod, ip: 10.10.15.33 }
 
   tasks:
   - name: 01. Create LAB VM Folder
@@ -217,5 +217,40 @@
       template: "{{ item[0].Temp_Server }}"
       linked_clone: True
       snapshot_src: "{{ snapshot_name }}"
+      networks:
+        - name: "{{ item[0].id }}-{{ item[1].pg }}"
+          label: "Network adapter 1"
+          connected: True
+          start_connected: True
+          ip: "{{ item[1].ip }}"
+          netmask: 255.255.255.0          
+          gateway:  10.10.15.1
+      customization:
+        domain: "vclass.local"
+        hostname: " {{ item[1].name }}"
+        dns_servers:
+          - 10.10.10.1
+        dns_suffix:
+          - vclass.local
+        script_text: |
+          #!/bin/bash
+          touch /tmp/touch-from-playbook
     loop: "{{ LAB_SID | product(LAB_VMs) | list }}"
     delegate_to: localhost
+
+  # - name: 13. Delete Ansible Lab vm
+  #   community.vmware.vmware_guest:
+  #     hostname: "{{ vcenter_hostname }}"
+  #     username: "{{ vcenter_username }}"
+  #     password: "{{ vcenter_password }}"
+  #     validate_certs: no
+  #     name: "{{ item[0].id }}-{{ item[1].name }}"
+  #     datacenter: "{{ datacenter_name }}"
+  #     folder: "{{ parent_folder }}{{ item[0].id }}"
+  #     esxi_hostname: "{{ item[0].host }}"
+  #     datastore: "{{ item[0].ds }}"
+  #     state: absent
+  #     force: true
+  #   loop: "{{ LAB_SID | product(LAB_VMs) | list }}"
+  #   delegate_to: localhost
+
