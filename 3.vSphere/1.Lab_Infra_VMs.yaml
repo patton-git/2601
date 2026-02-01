@@ -153,3 +153,38 @@
         iso_path: "[{{ item.ds }}]\\ISO\\TrueNAS-SCALE-25.10.1.iso"
     loop: "{{ LAB_SID }}"        
     delegate_to: localhost
+
+  - name: Create Windows Template VM
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ item.ds }}"
+      folder: "{{ parent_folder }}{{ item.id }}"
+      name: "{{ item.id }}-Temp-Windows"
+      state: poweredoff
+      guest_id: windows2019srvNext_64Guest
+      esxi_hostname: "{{ item.host }}"
+      hardware:
+        num_cpus: 2
+        hotadd_cpu: true          
+        memory_mb: 8192
+        hotadd_memory: true
+        scsi: paravirtual
+      disk:
+      - size_gb: 90
+        type: thin
+        datastore: "{{ item.ds }}"
+      networks:
+      - name: "{{ item.id }}-Mgmt"
+        device_type: vmxnet3
+        label: "Network Adapter 1"
+      cdrom:
+      - controller_number: 0
+        unit_number: 0
+        state: present
+        type: iso
+        iso_path: "[{{ item.ds }}]\\ISO\\en-us_windows_server_2022_updated_aug_2025_x64_dvd_0f3822cf.iso"
+    loop: "{{ LAB_SID }}"        
+    delegate_to: localhost
