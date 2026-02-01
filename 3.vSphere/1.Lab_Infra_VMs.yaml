@@ -59,9 +59,9 @@
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       validate_certs: no
-      datacenter: '{{datacenter_name}}'
+      datacenter: "{{datacenter_name}}"
       folder: "{{ parent_folder }}{{ item[0].id }}"
-      name: "{{ item[0].id }}-{{ item[1] }}"
+      name: "{{ item[0].id }}-{{ item[1].name }}"
       state: poweredoff
       guest_id: vmkernel8Guest
       esxi_hostname: "{{ item[0].host }}"
@@ -71,11 +71,11 @@
         memory_mb: 16384
       disk:
       - size_gb: 200
-        controller_type: 'nvme'
+        controller_type: "nvme"
         controller_number: 0
         unit_number: 0
         type: thin
-        datastore: '{{ datastore_name }}'
+        datastore: "{{ item[0].ds }}"
       networks:
       - name: "{{ item[0].id}}-Trunk"
         device_type: vmxnet3
