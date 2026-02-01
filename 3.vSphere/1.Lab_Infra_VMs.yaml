@@ -102,11 +102,11 @@
       password: "{{ vcenter_password }}"
       validate_certs: no
       datacenter: '{{datacenter_name}}'
-      folder: "{{ parent_folder }}{{ item[0].id }}"
-      name: "{{ item[0].id }}-Truenas"
+      folder: "{{ parent_folder }}{{ item.id }}"
+      name: "{{ item.id }}-Truenas"
       state: poweredoff
       guest_id: freebsd13_64Guest
-      esxi_hostname: "{{ item[0].host }}"
+      esxi_hostname: "{{ item.host }}"
       hardware:
         num_cpus: 2
         nested_virt: yes
@@ -117,32 +117,32 @@
         controller_number: 0
         unit_number: 0
         type: thin
-        datastore: "{{ item[0].ds }}"
+        datastore: "{{ item.ds }}"
       - size_gb: 100
         controller_type: 'nvme'
         controller_number: 0
         unit_number: 0
-        datastore: "{{ item[0].ds }}"
+        datastore: "{{ item.ds }}"
       - size_gb: 100
         controller_type: 'nvme'
         controller_number: 0
         unit_number: 1
-        datastore: "{{ item[0].ds }}"
+        datastore: "{{ item.ds }}"
       - size_gb: 100
         controller_type: 'nvme'
         controller_number: 0
         unit_number: 2
-        datastore: "{{ item[0].ds }}"
+        datastore: "{{ item.ds }}"
       - size_gb: 100
         controller_type: 'nvme'
         controller_number: 0
         unit_number: 3
-        datastore: "{{ item[0].ds }}"          
+        datastore: "{{ item.ds }}"          
       networks:
-      - name: "{{ item[0].id }}-iSCSI-1"
+      - name: "{{ item.id }}-iSCSI-1"
         device_type: vmxnet3
         label: "Network Adapter 1"
-      - name: "{{ item[0].id }}-iSCSI-2"
+      - name: "{{ item.id }}-iSCSI-2"
         device_type: vmxnet3
         label: "Network Adapter 2"
       cdrom:
@@ -150,6 +150,6 @@
         unit_number: 0
         state: present
         type: iso
-        iso_path: "[{{ item[0].ds }}]\\ISO\\TrueNAS-SCALE-25.10.1.iso"
+        iso_path: "[{{ item.ds }}]\\ISO\\TrueNAS-SCALE-25.10.1.iso"
     loop: "{{ LAB_SID }}"        
     delegate_to: localhost
