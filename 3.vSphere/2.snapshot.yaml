@@ -7,7 +7,7 @@
 
     student_id: "S00"   ## 해당값을 변경해 주세요. 폴더/스위치/포트그룹/VM명을 유니크하게 사용하기 위해서 사용됩니다.
 
-    vcenter_hostname: "vcsa.lab.git"
+    vcenter_hostname: "vcsa.vclass.rapa"
     vcenter_username: "{{ student_id | lower }}@vclass.rapa"  # | lower filter로 소문자 변환 가능
     vcenter_password: "VMware123!"
     datacenter_name: "RAPA" 
