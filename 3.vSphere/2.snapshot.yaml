@@ -1,0 +1,86 @@
+---
+- name: Snapshot_LAB_VMs
+  hosts: localhost
+  gather_facts: no
+  vars:
+    ansible_python_interpreter: /bin/python3
+
+    student_id: "S00"   ## 해당값을 변경해 주세요. 폴더/스위치/포트그룹/VM명을 유니크하게 사용하기 위해서 사용됩니다.
+
+    vcenter_hostname: "vcsa.lab.git"
+    vcenter_username: "{{ student_id | lower }}@vclass.rapa"  # | lower filter로 소문자 변환 가능
+    vcenter_password: "VMware123!"
+    datacenter_name: "RAPA" 
+    parent_folder: "3.Class/" 
+
+    vSphere_LAB_VMs:
+    - { name: esx-01 }
+    - { name: esx-02 }
+    - { name: esx-03 }
+    - { name: VCSA }
+    - { name: Truenas }
+    
+  vars_prompt:
+  - name: snapshot_task
+    prompt: "Which snapshot task want? (create/revert/remove)"
+    private: no
+    default: "create"
+  - name: snapshot_name
+    prompt: "Snapshot name?"
+    private: no
+    default: "before_task"
+
+  handlers:
+  - name: Start VM after revert
+    community.vmware.vmware_guest_powerstate:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}" 
+      password: "{{ vcenter_password }}"
+      name: "{{ student_id }}-{{ item.name }}"
+      state: powered-on
+    loop: "{{ vSphere_LAB_VMs }}"  
+
+  tasks:
+  - name: Create a snapshot
+    community.vmware.vmware_guest_snapshot:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      datacenter: "{{ datacenter_name }}"
+      folder: "{{ parent_folder }}{{student_id}}"
+      name: "{{student_id}}-{{ item.name }}"
+      state: present
+      snapshot_name: "{{ snapshot_name }}"
+    loop: "{{ vSphere_LAB_VMs }}"    
+    delegate_to: localhost
+    when: snapshot_task == "create"
+  
+  - name: Revert to a snapshot
+    community.vmware.vmware_guest_snapshot:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      datacenter: "{{ datacenter_name }}"
+      folder: "{{ parent_folder }}{{student_id}}"
+      name: "{{student_id}}-{{ item.name }}"
+      state: revert
+      snapshot_name: "{{ snapshot_name }}"
+    loop: "{{ vSphere_LAB_VMs }}"    
+    delegate_to: localhost
+    when: snapshot_task == "revert"
+    notify: Start VM after revert
+  
+  - name: Remove a snapshot
+    community.vmware.vmware_guest_snapshot:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      datacenter: "{{ datacenter_name }}"
+      folder: "{{ parent_folder }}{{student_id}}"
+      name: "{{student_id}}-{{ item.name }}"
+      state: absent
+      snapshot_name: "{{ snapshot_name }}"
+    loop: "{{ vSphere_LAB_VMs }}"    
+    delegate_to: localhost
+    when: snapshot_task == "remove"
+  
