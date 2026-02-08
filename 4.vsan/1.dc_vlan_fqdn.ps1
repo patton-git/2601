@@ -92,11 +92,13 @@ foreach ($Server in $ServerList) {
     $IP = $Server.IP
     $FQDN = "$Name.$DomainName"
 
-    # 기존 A 레코드 확인 (IP까지 동일한지 체크하는 것이 더 정확함) 
-    $Existing = Get-DnsServerResourceRecordA -Name $Name -ZoneName $DomainName -ErrorAction SilentlyContinue
-    if ($Existing -and ($Existing.RecordData.IPv4Address.IPAddressToString -contains $IP)) {
-        Write-Host "  이미 존재: $FQDN <-> $IP" -ForegroundColor Magenta
-        continue
+    $Existing = Get-DnsServerResourceRecord -Name $Name -ZoneName $DomainName -RRType "A" -ErrorAction SilentlyContinue
+    if ($Existing) {
+        $ExistingIP = $Existing.RecordData.IPv4Address.IPAddressToString
+        if ($ExistingIP -eq $IP) {
+            Write-Host "  이미 동일한 레코드가 존재합니다: $FQDN <-> $IP" -ForegroundColor Magenta
+            continue
+        }
     }
 
     try {
