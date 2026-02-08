@@ -105,7 +105,7 @@
       timeout: 120
     delegate_to: localhost
 
-  - name: 06. Configure ESX VMs (Fixed Syntax)
+  - name: 06. Configure ESX VMs and Shutdown
     community.vmware.vmware_vm_shell:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -119,27 +119,33 @@
       vm_shell: /bin/sh
       vm_shell_cwd: "/tmp"
       vm_shell_args: >
-        -c "{
-        echo '--- Start: $(date) ---';
-        esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1;
-        sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf;
-        esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }};
-        esxcli system hostname set --host {{ item[1].name }};
-        esxcli system hostname set --domain vclass.local;
-        esxcli network ip dns server add -s 10.10.10.1;
-        esxcli network ip dns search add -d vclass.local;
-        vim-cmd hostsvc/datastore/remove datastore1;
-        vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1;
-        /sbin/generate-certificates;
-        sleep 2;
-        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }};
-        echo '--- End: $(date) ---';
-        } > /tmp/ansible_config.log 2>&1"
-      # 수정된 부분 3: 에러 확인을 위해 True로 변경 (IP 변경 전까지만 테스트할 때 유용)
-      wait_for_process: True
+        -c "nohup sh -c '
+        LOG=/tmp/ansible_config.log;
+        {
+          echo \"--- Start Config: \$(date) ---\";
+          /bin/esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1;
+          /bin/sed -i \"s#/system/uuid.*##\" /etc/vmware/esx.conf;
+          /bin/esxcli network vswitch standard portgroup set -p \"Management Network\" -v {{ item[1].vlan }};
+          /bin/esxcli system hostname set --host {{ item[1].name }};
+          /bin/esxcli system hostname set --domain vclass.local;
+          /bin/esxcli network ip dns server add -s 10.10.10.1;
+          /bin/esxcli network ip dns search add -d vclass.local;
+          /bin/vim-cmd hostsvc/datastore/remove datastore1;
+          /bin/vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1;
+          
+          echo \"Applying IP Address... {{ item[1].ip }}\";
+          /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }};
+          
+          echo \"Generating Certificates...\";
+          /sbin/generate-certificates;
+          
+          echo \"--- Config Finished: \$(date) ---\";
+          sleep 5;
+          /sbin/poweroff;
+        } > \$LOG 2>&1' > /dev/null 2>&1 &"
+      wait_for_process: False
     loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
-    delegate_to: localhost    
-
+    delegate_to: localhost
 
   - name: 07. Reboot ESX VMs
     community.vmware.vmware_guest_powerstate:
