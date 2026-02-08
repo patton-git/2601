@@ -9,6 +9,16 @@ $InternalNIC = "Ethernet0"
     Set-NetIPInterface -InterfaceAlias $vName -InterfaceMetric $_
 }
 
+# $TeamName = "Lab-Internal-Trunk"
+# 20, 23, 24, 30 | ForEach-Object {
+#     $vName = "VLAN$_"
+#     Write-Host "삭제 중: $vName..." -ForegroundColor Yellow
+#     Remove-NetIPAddress -InterfaceAlias $vName -Confirm:$false -ErrorAction SilentlyContinue
+#     Remove-NetLbfoTeamNic -Team $TeamName -Name $vName -Confirm:$false -ErrorAction SilentlyContinue
+# }
+# Write-Host "지정한 모든 VLAN 인터페이스 삭제 완료." -ForegroundColor Green
+
+
 # [변수 설정]
 $DomainName = "vclass.local"
 
