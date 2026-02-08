@@ -123,33 +123,14 @@
         -c "nohup sh -c '
         LOG=/tmp/ansible_final.log
         echo \"--- Start Robust Config --- \$(date)\" > \$LOG
-        
         /bin/esxcli system hostname set --host {{ item[1].name }} >> \$LOG 2>&1
-        /bin/esxcli system hostname set --domain vclass.local >> \$LOG 2>&1
-        /bin/grep -v \"system/uuid\" /etc/vmware/esx.conf > /tmp/esx.conf.tmp
-        /bin/cat /tmp/esx.conf.tmp > /etc/vmware/esx.conf && rm /tmp/esx.conf.tmp
-
-        COUNT=0
-        while [ \$COUNT -lt 3 ]; do
-          echo \"Attempting IP Config (\$((COUNT+1))/3)...\" >> \$LOG
-          /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 >> \$LOG 2>&1
-          if [ \$? -eq 0 ]; then
-            echo \"IP Config Success!\" >> \$LOG
-            break
-          fi
-          COUNT=\$((COUNT+1))
-          sleep 5
-        done
-
-        echo \"Restarting Management Services...\" >> \$LOG
-        /sbin/services.sh restart hostd >> \$LOG 2>&1
-        sleep 15
-
+        /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 >> \$LOG 2>&1
         /bin/esxcli network ip route ipv4 add -g {{ item[1].gw }} -n default >> \$LOG 2>&1 || true
-        /bin/esxcli network ip dns server remove --all >> \$LOG 2>&1 || true
-        /bin/esxcli network ip dns server add -s 10.10.10.1 >> \$LOG 2>&1 || true
-        
+        /bin/esxcli network vswitch standard portgroup set -p \"Management Network\" -v {{ item[1].vlan }}; >> \$LOG 2>&1 || true 
+        /bin/esxcli network ip dns server add -s 10.10.10.1  >> \$LOG 2>&1 || true
+        /bin/esxcli system ntp set -e 1 -s {{ item[1].gw }} >> \$LOG 2>&1 || true
         /sbin/generate-certificates >> \$LOG 2>&1
+        /sbin/auto-backup.sh >> \$LOG 2>&1
         echo \"--- All Done --- \$(date)\" >> \$LOG
         sleep 5
         # /sbin/poweroff
