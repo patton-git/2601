@@ -105,7 +105,7 @@
       timeout: 120
     delegate_to: localhost
 
-  - name: 06. Configure ESX VMs and Shutdown
+  - name: 06. Configure ESX VMs and Shutdown (Final Bulletproof Version)
     community.vmware.vmware_vm_shell:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -118,44 +118,44 @@
       vm_password: 'VMware123!'
       vm_shell: /bin/sh
       vm_shell_cwd: "/tmp"
-      vm_shell_args: >
+      vm_shell_args: |
         -c "nohup sh -c '
-        LOG=/tmp/ansible_config.log;
-        {
-          echo \"--- Start Config: \$(date) ---\";
-          /bin/esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1;
-          /bin/sed -i \"s#/system/uuid.*##\" /etc/vmware/esx.conf;
-          /bin/esxcli network vswitch standard portgroup set -p \"Management Network\" -v {{ item[1].vlan }};
-          /bin/esxcli system hostname set --host {{ item[1].name }};
-          /bin/esxcli system hostname set --domain vclass.local;
-          /bin/esxcli network ip dns server add -s 10.10.10.1;
-          /bin/esxcli network ip dns search add -d vclass.local;
-          /bin/vim-cmd hostsvc/datastore/remove datastore1;
-          /bin/vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1;
-          
-          echo \"Applying IP Address... {{ item[1].ip }}\";
-          /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }};
-          
-          echo \"Generating Certificates...\";
-          /sbin/generate-certificates;
-          
-          echo \"--- Config Finished: \$(date) ---\";
-          sleep 5;
-          /sbin/poweroff;
-        } > \$LOG 2>&1' > /dev/null 2>&1 &"
+        echo --- Start Configuration --- > /tmp/ansible_config.log 2>&1
+        /bin/esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1 >> /tmp/ansible_config.log 2>&1
+        /bin/sed -i \"s#/system/uuid.*##\" /etc/vmware/esx.conf >> /tmp/ansible_config.log 2>&1
+        /bin/esxcli network vswitch standard portgroup set -p \"Management Network\" -v {{ item[1].vlan }} >> /tmp/ansible_config.log 2>&1
+        /bin/esxcli system hostname set --host {{ item[1].name }} >> /tmp/ansible_config.log 2>&1
+        /bin/esxcli system hostname set --domain vclass.local >> /tmp/ansible_config.log 2>&1
+        /bin/esxcli network ip dns server add -s 10.10.10.1 >> /tmp/ansible_config.log 2>&1
+        /bin/esxcli network ip dns search add -d vclass.local >> /tmp/ansible_config.log 2>&1
+        /bin/vim-cmd hostsvc/datastore/remove datastore1 >> /tmp/ansible_config.log 2>&1
+        /bin/vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1 >> /tmp/ansible_config.log 2>&1
+        
+        echo \"Applying IP Address: {{ item[1].ip }}\" >> /tmp/ansible_config.log 2>&1
+        /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }} >> /tmp/ansible_config.log 2>&1
+        
+        echo \"Generating Certificates...\" >> /tmp/ansible_config.log 2>&1
+        /sbin/generate-certificates >> /tmp/ansible_config.log 2>&1
+        
+        echo --- Config Finished --- >> /tmp/ansible_config.log 2>&1
+        sleep 5
+        ' > /dev/null 2>&1 &"
       wait_for_process: False
     loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
     delegate_to: localhost
+      # /sbin/poweroff
+  
 
-  - name: 07. Reboot ESX VMs
-    community.vmware.vmware_guest_powerstate:
-      hostname: "{{ vcenter_hostname }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      validate_certs: no
-      datacenter: "{{ datacenter_name }}"
-      folder: "{{ parent_folder }}{{ item[0].id }}"
-      name: "{{ item[0].id }}-{{ item[1].name }}"
-      state: reboot-guest
-    loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
-    delegate_to: localhost
+    
+  # - name: 07. Reboot ESX VMs
+  #   community.vmware.vmware_guest_powerstate:
+  #     hostname: "{{ vcenter_hostname }}"
+  #     username: "{{ vcenter_username }}"
+  #     password: "{{ vcenter_password }}"
+  #     validate_certs: no
+  #     datacenter: "{{ datacenter_name }}"
+  #     folder: "{{ parent_folder }}{{ item[0].id }}"
+  #     name: "{{ item[0].id }}-{{ item[1].name }}"
+  #     state: reboot-guest
+  #   loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
+  #   delegate_to: localhost
