@@ -1,0 +1,8 @@
+- name: Test - Create simple file
+    community.vmware.vmware_vm_shell:
+      # ... (중략: 접속 정보) ...
+      vm_shell: /bin/sh
+      vm_shell_args: "-c 'touch /tmp/ansible_test_success'"
+      wait_for_process: True
+    loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
+    delegate_to: localhost
