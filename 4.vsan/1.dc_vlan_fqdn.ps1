@@ -14,7 +14,7 @@ $InternalNIC = "Ethernet0"
 #     $vName = "VLAN$_"
 #     Write-Host "삭제 중: $vName..." -ForegroundColor Yellow
 #     Remove-NetIPAddress -InterfaceAlias $vName -Confirm:$false -ErrorAction SilentlyContinue
-#     Remove-NetLbfoTeamNic -Team $TeamName -Name $vName -Confirm:$false -ErrorAction SilentlyContinue
+#     Remove-NetLbfoTeamNic -Team $TeamName -VlanID $_ -Confirm:$false -ErrorAction SilentlyContinue
 # }
 # Write-Host "지정한 모든 VLAN 인터페이스 삭제 완료." -ForegroundColor Green
 
