@@ -100,61 +100,10 @@
     loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
     delegate_to: localhost
 
-
-  # - name: 05.Wait for VMware Tools to become available
-  #   community.vmware.vmware_guest_info:
-  #     hostname: "{{ vcenter_hostname }}"
-  #     username: "{{ vcenter_username }}"
-  #     password: "{{ vcenter_password }}"
-  #     validate_certs: no
-  #     datacenter: "{{ datacenter_name }}"
-  #     name: "{{ item[0].id }}-{{ item[1].name }}"
-  #   register: vm_info
-  #   until: 
-  #     - vm_info.instance.guest_tools_status == "toolsOk"
-  #     - vm_info.instance.hw_power_status == "poweredOn"
-  #   retries: 30
-  #   delay: 10
-  #   loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
-  #   delegate_to: localhost
-
-  - name: 05-1. Get VM Info for Debugging
-    community.vmware.vmware_guest_info:
-      hostname: "{{ vcenter_hostname }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      validate_certs: no
-      datacenter: "{{ datacenter_name }}"
-      name: "{{ item[0].id }}-{{ item[1].name }}"
-    register: vm_debug_info
-    loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
+  - name: 05. Waiting 120 seconds for booting
+    wait_for:
+      timeout: 120
     delegate_to: localhost
-
-  # 이 부분을 통해 실제로 어떤 값이 들어오는지 로그에서 확인 가능합니다.
-  - name: 05-2. Show Guest Tools Status
-    debug:
-      msg: "VM: {{ item.instance.hw_name }} / Status: {{ item.instance.guest_tools_status }}"
-    loop: "{{ vm_debug_info.results }}"
-
-  - name: 05-3. Wait for VMware Tools (Enhanced Condition)
-    community.vmware.vmware_guest_info:
-      hostname: "{{ vcenter_hostname }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      validate_certs: no
-      datacenter: "{{ datacenter_name }}"
-      name: "{{ item[0].id }}-{{ item[1].name }}"
-    register: vm_status
-    # 조건 최적화: Ok 또는 Old(버전차이)인 경우 모두 허용
-    until: 
-      - vm_status.instance.guest_tools_status in ["toolsOk", "toolsOld"]
-      - vm_status.instance.hw_power_status == "poweredOn"
-    retries: 60
-    delay: 10
-    loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
-    delegate_to: localhost
-    
-
     
   - name: 06. Configure ESX VMs with Logging
     community.vmware.vmware_vm_shell:
