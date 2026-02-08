@@ -23,7 +23,7 @@ $ServerList = @(
     @{HostName="sb-esx-03"; IP="10.10.20.13"},
     @{HostName="sb-esx-04"; IP="10.10.20.14"},
     @{HostName="sc-witness-01"; IP="10.10.30.11"},
-    @{HostName="sc-witness-01"; IP="10.10.30.12"},
+    @{HostName="sc-witness-01"; IP="10.10.30.12"}
 )
 
 # [함수] CIDR에서 역방향 영역명 생성
