@@ -1,8 +1,44 @@
-- name: Test - Create simple file
-    community.vmware.vmware_vm_shell:
-      # ... (중략: 접속 정보) ...
-      vm_shell: /bin/sh
-      vm_shell_args: "-c 'touch /tmp/ansible_test_success'"
-      wait_for_process: True
-    loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
+---
+- name: Deploy Lab
+  hosts: localhost
+  gather_facts: no
+  vars:
+    ansible_python_interpreter: /bin/python3
+    vcenter_hostname: "vcsa.vclass.rapa"
+    vcenter_username: "administrator@vsphere.local"
+    vcenter_password: "VMware123!"
+    datacenter_name: "RAPA" 
+    esxi_username: "root"
+    esxi_password: "VMware123!"
+    parent_folder: "3.Class/" 
+    snapshot_name: "Setup"
+    
+    LAB_SID: 
+    - { id: S00, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_ESX: Temp-ESX-01 }
+    # - { id: S01, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_ESX: Temp-ESX-01 }
+    # - { id: S02, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_ESX: Temp-ESX-01 }
+    # - { id: S03, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_ESX: Temp-ESX-01 }
+    # - { id: S04, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_ESX: Temp-ESX-01 }
+    # - { id: S05, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_ESX: Temp-ESX-02 }
+    # - { id: S06, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_ESX: Temp-ESX-02 }
+    # - { id: S07, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_ESX: Temp-ESX-02 }
+    # - { id: S08, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_ESX: Temp-ESX-02 }
+    # - { id: S09, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_ESX: Temp-ESX-02 }
+
+  tasks:
+
+  - name: 02.Deploy ESX VMs
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      folder: "{{ parent_folder }}{{ item[0].id }}"
+      name: "S00-Temp-VCSA-01"
+      state: poweredoff
+      esxi_hostname: "{{ item[0].host }}"
+      template: "S00-VCSA"
+      linked_clone: True
+      snapshot_src: "before_task"      
     delegate_to: localhost
