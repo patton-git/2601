@@ -108,7 +108,17 @@
 
   - name: 06. Configure ESX VMs (Robust Final Version)
     community.vmware.vmware_vm_shell:
-      # ... (접속 정보 생략) ...
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      vm_id: "{{ item[0].id }}-{{ item[1].name }}"
+      vm_id_type: vm_name
+      vm_username: "root"
+      vm_password: "VMware123!"
+      vm_shell: /bin/sh
+      vm_shell_cwd: "/tmp"
       vm_shell_args: |
         -c "nohup sh -c '
         LOG=/tmp/ansible_final.log
