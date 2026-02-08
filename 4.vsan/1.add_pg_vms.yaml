@@ -123,7 +123,7 @@
         -c "nohup sh -c '
         LOG=/tmp/ansible_final.log
         echo \"--- Start Robust Config --- \$(date)\" > \$LOG
-        /bin/esxcli system hostname set --host {{ item[1].name }} >> \$LOG 2>&1
+        /bin/esxcli system hostname set --fqdn {{ item[1].name }}.vclass.local >> \$LOG 2>&1
         /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 >> \$LOG 2>&1
         /bin/esxcli network ip route ipv4 add -g {{ item[1].gw }} -n default >> \$LOG 2>&1 || true
         /bin/esxcli network vswitch standard portgroup set -p \"Management Network\" -v {{ item[1].vlan }}; >> \$LOG 2>&1 || true 
