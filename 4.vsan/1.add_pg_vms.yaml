@@ -130,10 +130,11 @@
         /bin/esxcli network ip dns server add -s 10.10.10.1  >> \$LOG 2>&1 || true
         /bin/esxcli system ntp set -e 1 -s {{ item[1].gw }} >> \$LOG 2>&1 || true
         /sbin/generate-certificates >> \$LOG 2>&1
+        sleep 10
         /sbin/auto-backup.sh >> \$LOG 2>&1
         echo \"--- All Done --- \$(date)\" >> \$LOG
-        sleep 5
-        # /sbin/poweroff
+        sleep 10
+        /sbin/poweroff
         ' > /dev/null 2>&1 &"
       wait_for_process: False
     loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
