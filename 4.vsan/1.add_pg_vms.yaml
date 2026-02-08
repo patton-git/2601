@@ -105,49 +105,46 @@
       timeout: 120
     delegate_to: localhost
 
-  - name: 06. Configure ESX VMs (Final IO Error Fix)
+
+  - name: 06. Configure ESX VMs (Robust Final Version)
     community.vmware.vmware_vm_shell:
-      hostname: "{{ vcenter_hostname }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      validate_certs: no
-      datacenter: "{{ datacenter_name }}"
-      vm_id: "{{ item[0].id }}-{{ item[1].name }}"
-      vm_id_type: vm_name
-      vm_username: 'root'
-      vm_password: 'VMware123!'
-      vm_shell: /bin/sh
-      vm_shell_cwd: "/tmp"
+      # ... (접속 정보 생략) ...
       vm_shell_args: |
         -c "nohup sh -c '
         LOG=/tmp/ansible_final.log
-        echo \"--- Final Configuration Start --- \$(date)\" > \$LOG
+        echo \"--- Start Robust Config --- \$(date)\" > \$LOG
         
         /bin/esxcli system hostname set --host {{ item[1].name }} >> \$LOG 2>&1
         /bin/esxcli system hostname set --domain vclass.local >> \$LOG 2>&1
         /bin/grep -v \"system/uuid\" /etc/vmware/esx.conf > /tmp/esx.conf.tmp
         /bin/cat /tmp/esx.conf.tmp > /etc/vmware/esx.conf && rm /tmp/esx.conf.tmp
-        /bin/vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1 >> \$LOG 2>&1
 
-        echo \"Step 1: Applying IP {{ item[1].ip }} and Restarting Management Service...\" >> \$LOG
-        /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 >> \$LOG 2>&1
-        
-        /etc/init.d/hostd restart >> \$LOG 2>&1
-        sleep 10  # 서비스가 다시 올라올 때까지 대기
+        COUNT=0
+        while [ \$COUNT -lt 3 ]; do
+          echo \"Attempting IP Config (\$((COUNT+1))/3)...\" >> \$LOG
+          /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 >> \$LOG 2>&1
+          if [ \$? -eq 0 ]; then
+            echo \"IP Config Success!\" >> \$LOG
+            break
+          fi
+          COUNT=\$((COUNT+1))
+          sleep 5
+        done
 
-        echo \"Step 2: Adding Default Gateway...\" >> \$LOG
+        echo \"Restarting Management Services...\" >> \$LOG
+        /sbin/services.sh restart hostd >> \$LOG 2>&1
+        sleep 15
+
         /bin/esxcli network ip route ipv4 add -g {{ item[1].gw }} -n default >> \$LOG 2>&1 || true
-        
-        echo \"Step 3: Configuring DNS...\" >> \$LOG
         /bin/esxcli network ip dns server remove --all >> \$LOG 2>&1 || true
         /bin/esxcli network ip dns server add -s 10.10.10.1 >> \$LOG 2>&1 || true
         
         /sbin/generate-certificates >> \$LOG 2>&1
-        echo \"--- All Done. Powering off --- \$(date)\" >> \$LOG
+        echo \"--- All Done --- \$(date)\" >> \$LOG
         sleep 5
         # /sbin/poweroff
         ' > /dev/null 2>&1 &"
       wait_for_process: False
     loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
     delegate_to: localhost
-
+    
