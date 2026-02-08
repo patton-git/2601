@@ -105,7 +105,7 @@
       timeout: 120
     delegate_to: localhost
 
-  - name: 06. Configure ESX VMs and Safe Shutdown
+- name: 06. Configure ESX VMs (Network Stability Patch)
     community.vmware.vmware_vm_shell:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -118,148 +118,41 @@
       vm_password: 'VMware123!'
       vm_shell: /bin/sh
       vm_shell_cwd: "/tmp"
-      # YAML 블록 지시어 '|'를 사용하여 가독성과 정확성을 높입니다.
       vm_shell_args: |
         -c "nohup sh -c '
         LOG=/tmp/ansible_final.log
         echo \"--- Start Configuration ---\" > \$LOG
         
-        # 1. 호스트네임 설정 (실패해도 진행)
-        /bin/esxcli system hostname set --host {{ item[1].name }} >> \$LOG 2>&1 || true
-        /bin/esxcli system hostname set --domain vclass.local >> \$LOG 2>&1 || true
-        
-        # 2. esx.conf UUID 제거 (Operation not permitted 우회)
+        # 1. 시스템 기본 설정 (안전 영역)
+        /bin/esxcli system hostname set --host {{ item[1].name }} >> \$LOG 2>&1
+        /bin/esxcli system hostname set --domain vclass.local >> \$LOG 2>&1
         /bin/grep -v \"system/uuid\" /etc/vmware/esx.conf > /tmp/esx.conf.tmp
         /bin/cat /tmp/esx.conf.tmp > /etc/vmware/esx.conf && rm /tmp/esx.conf.tmp
+        /bin/vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1 >> \$LOG 2>&1
+
+        # 2. IP 변경 (이 시점에 네트워크 세션이 끊김)
+        echo \"Step 1: Changing IP to {{ item[1].ip }}...\" >> \$LOG
+        /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 >> \$LOG 2>&1 &
         
-        # 3. 기타 설정 (데이터스토어 삭제 실패 무시)
-        /bin/vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1 >> \$LOG 2>&1 || true
-        /bin/vim-cmd hostsvc/datastore/remove datastore1 >> \$LOG 2>&1 || true
+        # 3. 중요: 네트워크 스택 안정화를 위해 15초 대기 (IO Error 방지 핵심)
+        sleep 15
         
-        # 4. 네트워크 설정 (가장 중요)
-        echo \"Changing IP to {{ item[1].ip }}...\" >> \$LOG
-        /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 >> \$LOG 2>&1 || true
-        
-        # IP 변경 후 네트워크 스택 안정화를 위해 5초 대기 (IO Error 방지)
-        sleep 5
-        /bin/esxcli network ip dns server remove --all >> \$LOG 2>&1 || true
-        /bin/esxcli network ip dns server add -s 10.10.10.1 >> \$LOG 2>&1 || true
+        # 4. Gateway 및 DNS 설정 (네트워크 스택 재가동 후 실행)
+        echo \"Step 2: Adding Default Gateway...\" >> \$LOG
         /bin/esxcli network ip route ipv4 add -g {{ item[1].gw }} -n default >> \$LOG 2>&1 || true
         
-        # 5. 인증서 생성 및 종료
-        /sbin/generate-certificates >> \$LOG 2>&1 || true
-        echo \"--- Finished. Powering off... ---\" >> \$LOG
+        echo \"Step 3: Configuring DNS...\" >> \$LOG
+        /bin/esxcli network ip dns server remove --all >> \$LOG 2>&1 || true
+        /bin/esxcli network ip dns server add -s 10.10.10.1 >> \$LOG 2>&1 || true
+        
+        # 5. 인증서 갱신 및 종료
+        /sbin/generate-certificates >> \$LOG 2>&1
+        echo \"--- All Done. Powering off in 5s --- Comp: \$(date)\" >> \$LOG
         sleep 5
         ' > /dev/null 2>&1 &"
-      wait_for_process: False  # 백그라운드로 던지고 바로 다음으로 넘어가야 안전합니다.
+      wait_for_process: False
     loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
-    delegate_to: localhost    
-      # /sbin/poweroff
-  
-
-  # - name: 06-1. Basic Configuration (Wait for Success)
-  #   community.vmware.vmware_vm_shell:
-  #     hostname: "{{ vcenter_hostname }}"
-  #     username: "{{ vcenter_username }}"
-  #     password: "{{ vcenter_password }}"
-  #     validate_certs: no
-  #     datacenter: "{{ datacenter_name }}"
-  #     vm_id: "{{ item[0].id }}-{{ item[1].name }}"
-  #     vm_id_type: vm_name
-  #     vm_username: 'root'
-  #     vm_password: 'VMware123!'
-  #     vm_shell: /bin/sh
-  #     vm_shell_args: >
-  #       -c "echo 'Start 1/2' > /tmp/ansible_step1.log;
-  #       /bin/esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1 >> /tmp/ansible_step1.log 2>&1;
-  #       /bin/esxcli system hostname set --host {{ item[1].name }} >> /tmp/ansible_step1.log 2>&1;
-  #       /bin/esxcli system hostname set --domain vclass.local >> /tmp/ansible_step1.log 2>&1;
-  #       /bin/vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1 >> /tmp/ansible_step1.log 2>&1;
-  #       /bin/sed '/system.uuid/d' /etc/vmware/esx.conf > /tmp/esx.conf.new && /bin/cat /tmp/esx.conf.new > /etc/vmware/esx.conf >> /tmp/ansible_step1.log 2>&1;
-  #       /bin/vim-cmd hostsvc/datastore/remove datastore1 >> /tmp/ansible_step1.log 2>&1"
-  #     wait_for_process: True
-  #   loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
-  #   delegate_to: localhost
-
-
-  # - name: 06-2. Network IP Change and Power Off
-  #   community.vmware.vmware_vm_shell:
-  #     hostname: "{{ vcenter_hostname }}"
-  #     username: "{{ vcenter_username }}"
-  #     password: "{{ vcenter_password }}"
-  #     validate_certs: no
-  #     datacenter: "{{ datacenter_name }}"
-  #     vm_id: "{{ item[0].id }}-{{ item[1].name }}"
-  #     vm_username: 'root'
-  #     vm_password: 'VMware123!'
-  #     vm_shell: /bin/sh
-  #     vm_shell_args: >
-  #       -c "nohup sh -c '
-  #       echo \"Start 2/2\" > /tmp/ansible_step2.log;
-  #       /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 >> /tmp/ansible_step2.log 2>&1;
-  #       sleep 2;
-  #       /bin/esxcli network ip dns server remove --all >> /tmp/ansible_step2.log 2>&1;
-  #       /bin/esxcli network ip dns server add -s 10.10.10.1 >> /tmp/ansible_step2.log 2>&1;
-  #       /bin/esxcli network ip route ipv4 add -g {{ item[1].gw }} -n default >> /tmp/ansible_step2.log 2>&1;
-  #       /sbin/generate-certificates >> /tmp/ansible_step2.log 2>&1;
-  #       echo \"Done\" >> /tmp/ansible_step2.log;
-  #       sleep 5;
-  #     wait_for_process: False
-  #   loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
-  #   delegate_to: localhost
-        # /sbin/poweroff' > /dev/null 2>&1 &"
-    
-
-  # - name: 06. Configure ESX VMs (Refined with Error Handling)
-  #   community.vmware.vmware_vm_shell:
-  #     hostname: "{{ vcenter_hostname }}"
-  #     username: "{{ vcenter_username }}"
-  #     password: "{{ vcenter_password }}"
-  #     validate_certs: no
-  #     datacenter: "{{ datacenter_name }}"
-  #     vm_id: "{{ item[0].id }}-{{ item[1].name }}"
-  #     vm_id_type: vm_name
-  #     vm_username: 'root'
-  #     vm_password: 'VMware123!'
-  #     vm_shell: /bin/sh
-  #     vm_shell_cwd: "/tmp"
-  #     vm_shell_args: |
-  #       -c "nohup sh -c '
-  #       LOG=/tmp/ansible_config.log
-  #       echo --- Start Configuration --- > $LOG 2>&1
-
-  #       # 1. Hostname & Advanced Settings (안전)
-  #       /bin/esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1 >> $LOG 2>&1
-  #       /bin/esxcli system hostname set --host {{ item[1].name }} >> $LOG 2>&1
-  #       /bin/esxcli system hostname set --domain vclass.local >> $LOG 2>&1
-  #       /bin/vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1 >> $LOG 2>&1
-
-  #       # 2. DNS 설정 (DHCP 우선 제거)
-  #       /bin/esxcli network ip dns server remove --all >> $LOG 2>&1
-  #       /bin/esxcli network ip dns server add -s 10.10.10.1 >> $LOG 2>&1
-  #       /bin/esxcli network ip dns search add -d vclass.local >> $LOG 2>&1
-
-  #       # 3. esx.conf 수정 (sed -i 대신 출력 리다이렉션 사용)
-  #       # Operation not permitted 회피를 위해 sed 결과를 임시파일에 담고 cat으로 덮어씁니다.
-  #       /bin/sed \"s#/system/uuid.*##\" /etc/vmware/esx.conf > /tmp/esx.conf.tmp
-  #       /bin/cat /tmp/esx.conf.tmp > /etc/vmware/esx.conf && rm /tmp/esx.conf.tmp
-
-  #       # 4. IP 주소 설정 (vmk0)
-  #       echo \"Setting Static IP...\" >> $LOG 2>&1
-  #       /bin/esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 >> $LOG 2>&1
-        
-  #       # 5. 네트워크 스택 안정화를 위한 대기 후 게이트웨이 설정 (IO Error 방지)
-  #       sleep 5
-  #       /bin/esxcli network ip route ipv4 add -g {{ item[1].gw }} -n default >> $LOG 2>&1
-
-  #       # 6. 마무리 작업
-  #       /sbin/generate-certificates >> $LOG 2>&1
-  #       echo --- Config Finished --- >> $LOG 2>&1
-  #       sleep 5
-  #       ' > /dev/null 2>&1 &"
-  #     wait_for_process: False
-  #   loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
-  #   delegate_to: localhost
+    delegate_to: localhost
         # /sbin/poweroff
 
     
