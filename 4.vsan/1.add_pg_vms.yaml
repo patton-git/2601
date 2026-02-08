@@ -14,7 +14,16 @@
     snapshot_name: "Setup"
     
     LAB_SID: 
-    - { id: S00, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_ESX: Temp-ESX-01 }
+    # - { id: S00, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_ESX: Temp-ESX-01 }
+    # - { id: S01, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_ESX: Temp-ESX-01 }
+    # - { id: S02, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_ESX: Temp-ESX-01 }
+    # - { id: S03, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_ESX: Temp-ESX-01 }
+    # - { id: S04, host: esx-01.vclass.rapa, ds: vSAN-ESX-01, Temp_ESX: Temp-ESX-01 }
+    # - { id: S05, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_ESX: Temp-ESX-02 }
+    # - { id: S06, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_ESX: Temp-ESX-02 }
+    # - { id: S07, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_ESX: Temp-ESX-02 }
+    # - { id: S08, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_ESX: Temp-ESX-02 }
+    # - { id: S09, host: esx-02.vclass.rapa, ds: vSAN-ESX-02, Temp_ESX: Temp-ESX-02 }
 
     LAB_PGs:
     - { name: SB-Mgmt,   vid: 20 }
@@ -23,6 +32,9 @@
     - { name: SC-Mgmt,   vid: 30 }
 
     ESX_VMs:
+    # - { name: esx-01,    ip: 10.10.10.11,  gw: 10.10.10.1,  vlan: 10 }
+    # - { name: esx-02,    ip: 10.10.10.12,  gw: 10.10.10.1,  vlan: 10 }
+    # - { name: esx-03,    ip: 10.10.10.13,  gw: 10.10.10.1,  vlan: 10 }
     - { name: esx-04,    ip: 10.10.10.14,  gw: 10.10.10.1,  vlan: 10 }
     - { name: sb-esx-01, ip: 10.10.20.11,  gw: 10.10.20.1,  vlan: 20 }
     - { name: sb-esx-02, ip: 10.10.20.12,  gw: 10.10.20.1,  vlan: 20 }
