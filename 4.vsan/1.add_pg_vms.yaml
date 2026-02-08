@@ -26,13 +26,13 @@
     - { name: esx-04,    ip: 10.10.10.14,  gw: 10.10.10.1,  vlan: 10 }
     - { name: sb-esx-01, ip: 10.10.20.11,  gw: 10.10.20.1,  vlan: 20 }
     - { name: sb-esx-02, ip: 10.10.20.12,  gw: 10.10.20.1,  vlan: 20 }
-    - { name: sb-esx-03, ip: 10.10.20.12,  gw: 10.10.20.1,  vlan: 20 }
-    - { name: sb-esx-04, ip: 10.10.20.12,  gw: 10.10.20.1,  vlan: 20 }
+    - { name: sb-esx-03, ip: 10.10.20.13,  gw: 10.10.20.1,  vlan: 20 }
+    - { name: sb-esx-04, ip: 10.10.20.14,  gw: 10.10.20.1,  vlan: 20 }
 
 
   tasks:
 
-  - name: 01. Adding LAB Portgroups to LAB Switch
+  - name: 01.Adding LAB Portgroups to LAB Switch
     community.vmware.vmware_portgroup:
       hostname: "{{ item[0].host }}"
       username: "{{ esxi_username }}"
@@ -45,7 +45,7 @@
     loop: "{{ LAB_SID | product(LAB_PGs) | list }}"
     delegate_to: localhost
 
-  - name: 02. Deploy ESX VMs
+  - name: 02.Deploy ESX VMs
     community.vmware.vmware_guest:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -63,7 +63,7 @@
     delegate_to: localhost
 
 
-  - name: 03. Change ESX VMs Nics
+  - name: 03.Change ESX VMs Nics
     community.vmware.vmware_guest:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -87,7 +87,7 @@
     delegate_to: localhost
 
 
-  - name: 04. Power on ESXi VMs
+  - name: 04.Power on ESXi VMs
     community.vmware.vmware_guest:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -100,13 +100,25 @@
     loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
     delegate_to: localhost
 
-  - name: 05. Waiting boot-up
-    wait_for:
-      timeout: 180
+
+  - name: 05.Wait for VMware Tools to become available
+    community.vmware.vmware_guest_info:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      name: "{{ item[0].id }}-{{ item[1].name }}"
+    register: vm_info
+    until: 
+      - vm_info.instance.guest_tools_status == "toolsOk"
+      - vm_info.instance.hw_power_status == "poweredOn"
+    retries: 30
+    delay: 10
+    loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
     delegate_to: localhost
-
-
-  - name: 06. Configure ESX VMs
+    
+  - name: 06. Configure ESX VMs with Logging
     community.vmware.vmware_vm_shell:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -122,74 +134,129 @@
       vm_shell_cwd: "/tmp"
       vm_shell_args: >
         sh -c "
-        # 1. 호스트네임 및 기타 설정 먼저 수행
+        LOG='/tmp/ansible_config.log';
+        exec > $LOG 2>&1;
+        echo '--- Starting Configuration: $(date) ---';
+
+        echo '[1/9] Setting FollowHardwareMac...';
+        esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1;
+
+        echo '[2/9] Modifying esx.conf (UUID)...';
+        sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf;
+
+        echo '[3/9] Setting Management VLAN...';
+        esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }};
+
+        echo '[4/9] Setting Hostname and Domain...';
         esxcli system hostname set --host {{ item[1].name }};
         esxcli system hostname set --domain vclass.local;
-        esxcli network ip dns server -s 10.10.10.1;
-        esxcli network ip dns search -d vclass.local;
-        
-        # 2. VLAN 설정 적용
-        esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }};
-        
-        # 3. IP 설정 적용 (가장 중요)
-        # 설정 후 즉시 반영을 위해 vmk0를 재시작하는 명령을 결합합니다.
-        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }};
-        esxcli network ip interface set -e false -i vmk0;
-        esxcli network ip interface set -e true -i vmk0;
-        
-        # 4. 게이트웨이 및 라우팅 확정
-        esxcli network ip route ipv4 add -n 0.0.0.0/0 -g {{ item[1].gw }} || true;
-        
-        # 5. Management Network 전체 재시작 (선택 사항)
-        /etc/init.d/hostd restart;
-        /etc/init.d/vpxa restart;
-        "
-      # wait_for_process: False      
-      # vm_shell_args: >
-      #   sh -c "
-      #   esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1;
-      #   sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf;
-      #   esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }};
-      #   esxcli system hostname set --host {{ item[1].name }};
-      #   esxcli system hostname set --domain vclass.local;
-      #   esxcli network ip dns server -s 10.10.10.1;
-      #   esxcli network ip dns search -d vclass.local;
-      #   vim-cmd hostsvc/datastore/remove datastore1;
-      #   vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1;
-      #   /sbin/generate-certificates;
-      #   sleep 2;
-      #   esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }}
-      #   "
 
-      
-      # vm_shell_args: |
-      #   echo "Don't remove this line. Write your ESXi configuration commands below."
-      #   esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1
-      #   sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf
-      #   esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }}
-      #   esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }}
-      #   esxcli network ip route ipv4 add -n 0.0.0.0/0 -g {{ item[1].gw }}
-      #   esxcli system hostname set --host {{ item[1].name }}
-      #   esxcli system hostname set --domain vclass.local
-      #   esxcli network ip dns server -s 10.10.10.1
-      #   esxcli network ip dns search -d vclass.local
-      #   vim-cmd hostsvc/datastore/remove datastore1        
-      #   vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1
-      #   /sbin/generate-certificates
+        echo '[5/9] Configuring DNS...';
+        esxcli network ip dns server add -s 10.10.10.1;
+        esxcli network ip dns search add -d vclass.local;
+
+        echo '[6/9] Removing default datastore...';
+        vim-cmd hostsvc/datastore/remove datastore1;
+
+        echo '[7/9] Suppressing Shell Warning...';
+        vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1;
+
+        echo '[8/9] Generating Certificates...';
+        /sbin/generate-certificates;
+
+        echo '[9/9] Setting Static IP and Gateway (Final Step)...';
+        sleep 2;
+        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }};
+
+        echo '--- Configuration Finished: $(date) ---';
+        "
       wait_for_process: False
     loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
     delegate_to: localhost
 
-
-  # - name: 07. Reboot ESX VMs
-  #   community.vmware.vmware_guest_powerstate:
+  # - name: 06. Configure ESX VMs
+  #   community.vmware.vmware_vm_shell:
   #     hostname: "{{ vcenter_hostname }}"
   #     username: "{{ vcenter_username }}"
   #     password: "{{ vcenter_password }}"
   #     validate_certs: no
   #     datacenter: "{{ datacenter_name }}"
   #     folder: "{{ parent_folder }}{{ item[0].id }}"
-  #     name: "{{ item[0].id }}-{{ item[1].name }}"
-  #     state: reboot-guest
+  #     vm_id: "{{ item[0].id }}-{{ item[1].name }}"
+  #     vm_id_type: vm_name
+  #     vm_username: 'root'
+  #     vm_password: 'VMware123!'
+  #     vm_shell: /bin/sh
+  #     vm_shell_cwd: "/tmp"
+  #     # vm_shell_args: >
+  #     #   sh -c "
+  #     #   # 1. 호스트네임 및 기타 설정 먼저 수행
+  #     #   esxcli system hostname set --host {{ item[1].name }};
+  #     #   esxcli system hostname set --domain vclass.local;
+  #     #   esxcli network ip dns server -s 10.10.10.1;
+  #     #   esxcli network ip dns search -d vclass.local;
+        
+  #     #   # 2. VLAN 설정 적용
+  #     #   esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }};
+        
+  #     #   # 3. IP 설정 적용 (가장 중요)
+  #     #   # 설정 후 즉시 반영을 위해 vmk0를 재시작하는 명령을 결합합니다.
+  #     #   esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }};
+  #     #   esxcli network ip interface set -e false -i vmk0;
+  #     #   esxcli network ip interface set -e true -i vmk0;
+        
+  #     #   # 4. 게이트웨이 및 라우팅 확정
+  #     #   esxcli network ip route ipv4 add -n 0.0.0.0/0 -g {{ item[1].gw }} || true;
+        
+  #     #   # 5. Management Network 전체 재시작 (선택 사항)
+  #     #   /etc/init.d/hostd restart;
+  #     #   /etc/init.d/vpxa restart;
+  #     #   "
+  #     # wait_for_process: False      
+  #     vm_shell_args: >
+  #       sh -c "
+  #       echo "Don't remove this line. Write your ESXi configuration commands below."
+  #       esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1;
+  #       sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf;
+  #       esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }};
+  #       esxcli system hostname set --host {{ item[1].name }};
+  #       esxcli system hostname set --domain vclass.local;
+  #       esxcli network ip dns server -s 10.10.10.1;
+  #       esxcli network ip dns search -d vclass.local;
+  #       vim-cmd hostsvc/datastore/remove datastore1;
+  #       vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1;
+  #       /sbin/generate-certificates;
+  #       sleep 2;
+  #       esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }}
+  #       "
+  #     # vm_shell_args: |
+  #     #   echo "Don't remove this line. Write your ESXi configuration commands below."
+  #     #   esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1
+  #     #   sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf
+  #     #   esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }}
+  #     #   esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }}
+  #     #   esxcli network ip route ipv4 add -n 0.0.0.0/0 -g {{ item[1].gw }}
+  #     #   esxcli system hostname set --host {{ item[1].name }}
+  #     #   esxcli system hostname set --domain vclass.local
+  #     #   esxcli network ip dns server -s 10.10.10.1
+  #     #   esxcli network ip dns search -d vclass.local
+  #     #   vim-cmd hostsvc/datastore/remove datastore1        
+  #     #   vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1
+  #     #   /sbin/generate-certificates
+  #     wait_for_process: False
   #   loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
   #   delegate_to: localhost
+
+
+  - name: 07. Reboot ESX VMs
+    community.vmware.vmware_guest_powerstate:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      folder: "{{ parent_folder }}{{ item[0].id }}"
+      name: "{{ item[0].id }}-{{ item[1].name }}"
+      state: reboot-guest
+    loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
+    delegate_to: localhost
