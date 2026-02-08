@@ -122,19 +122,46 @@
       vm_shell_cwd: "/tmp"
       vm_shell_args: >
         sh -c "
-        esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1;
-        sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf;
-        esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }};
+        # 1. 호스트네임 및 기타 설정 먼저 수행
         esxcli system hostname set --host {{ item[1].name }};
         esxcli system hostname set --domain vclass.local;
         esxcli network ip dns server -s 10.10.10.1;
         esxcli network ip dns search -d vclass.local;
-        vim-cmd hostsvc/datastore/remove datastore1;
-        vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1;
-        /sbin/generate-certificates;
-        sleep 2;
-        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }}
+        
+        # 2. VLAN 설정 적용
+        esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }};
+        
+        # 3. IP 설정 적용 (가장 중요)
+        # 설정 후 즉시 반영을 위해 vmk0를 재시작하는 명령을 결합합니다.
+        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }};
+        esxcli network ip interface set -e false -i vmk0;
+        esxcli network ip interface set -e true -i vmk0;
+        
+        # 4. 게이트웨이 및 라우팅 확정
+        esxcli network ip route ipv4 add -n 0.0.0.0/0 -g {{ item[1].gw }} || true;
+        
+        # 5. Management Network 전체 재시작 (선택 사항)
+        /etc/init.d/hostd restart;
+        /etc/init.d/vpxa restart;
         "
+      # wait_for_process: False      
+      # vm_shell_args: >
+      #   sh -c "
+      #   esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1;
+      #   sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf;
+      #   esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }};
+      #   esxcli system hostname set --host {{ item[1].name }};
+      #   esxcli system hostname set --domain vclass.local;
+      #   esxcli network ip dns server -s 10.10.10.1;
+      #   esxcli network ip dns search -d vclass.local;
+      #   vim-cmd hostsvc/datastore/remove datastore1;
+      #   vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1;
+      #   /sbin/generate-certificates;
+      #   sleep 2;
+      #   esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }}
+      #   "
+
+      
       # vm_shell_args: |
       #   echo "Don't remove this line. Write your ESXi configuration commands below."
       #   esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1
@@ -154,15 +181,15 @@
     delegate_to: localhost
 
 
-  - name: 07. Reboot ESX VMs
-    community.vmware.vmware_guest_powerstate:
-      hostname: "{{ vcenter_hostname }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      validate_certs: no
-      datacenter: "{{ datacenter_name }}"
-      folder: "{{ parent_folder }}{{ item[0].id }}"
-      name: "{{ item[0].id }}-{{ item[1].name }}"
-      state: reboot-guest
-    loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
-    delegate_to: localhost
+  # - name: 07. Reboot ESX VMs
+  #   community.vmware.vmware_guest_powerstate:
+  #     hostname: "{{ vcenter_hostname }}"
+  #     username: "{{ vcenter_username }}"
+  #     password: "{{ vcenter_password }}"
+  #     validate_certs: no
+  #     datacenter: "{{ datacenter_name }}"
+  #     folder: "{{ parent_folder }}{{ item[0].id }}"
+  #     name: "{{ item[0].id }}-{{ item[1].name }}"
+  #     state: reboot-guest
+  #   loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
+  #   delegate_to: localhost
