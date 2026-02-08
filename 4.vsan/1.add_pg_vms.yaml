@@ -120,21 +120,36 @@
       vm_password: 'VMware123!'
       vm_shell: /bin/sh
       vm_shell_cwd: "/tmp"
-      vm_shell_args: |
-        echo "Don't remove this line. Write your ESXi configuration commands below."
-        esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1
-        sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf
-        esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }}
+      vm_shell_args: >
+        sh -c "
+        esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1;
+        sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf;
+        esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }};
+        esxcli system hostname set --host {{ item[1].name }};
+        esxcli system hostname set --domain vclass.local;
+        esxcli network ip dns server -s 10.10.10.1;
+        esxcli network ip dns search -d vclass.local;
+        vim-cmd hostsvc/datastore/remove datastore1;
+        vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1;
+        /sbin/generate-certificates;
+        sleep 2;
         esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }}
-        esxcli network ip route ipv4 add -n 0.0.0.0/0 -g {{ item[1].gw }}
-        esxcli system hostname set --host {{ item[1].name }}
-        esxcli system hostname set --domain vclass.local
-        esxcli network ip dns server -s 10.10.10.1
-        esxcli network ip dns search -d vclass.local
-        vim-cmd hostsvc/datastore/remove datastore1        
-        vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1
-        /sbin/generate-certificates
-      wait_for_process: True
+        "
+      # vm_shell_args: |
+      #   echo "Don't remove this line. Write your ESXi configuration commands below."
+      #   esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1
+      #   sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf
+      #   esxcli network vswitch standard portgroup set -p 'Management Network' -v {{ item[1].vlan }}
+      #   esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }}
+      #   esxcli network ip route ipv4 add -n 0.0.0.0/0 -g {{ item[1].gw }}
+      #   esxcli system hostname set --host {{ item[1].name }}
+      #   esxcli system hostname set --domain vclass.local
+      #   esxcli network ip dns server -s 10.10.10.1
+      #   esxcli network ip dns search -d vclass.local
+      #   vim-cmd hostsvc/datastore/remove datastore1        
+      #   vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1
+      #   /sbin/generate-certificates
+      wait_for_process: False
     loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
     delegate_to: localhost
 
