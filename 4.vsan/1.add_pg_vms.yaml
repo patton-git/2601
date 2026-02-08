@@ -118,7 +118,7 @@
   #   loop: "{{ LAB_SID | product(ESX_VMs) | list }}"
   #   delegate_to: localhost
 
-- name: 05-1. Get VM Info for Debugging
+  - name: 05-1. Get VM Info for Debugging
     community.vmware.vmware_guest_info:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
