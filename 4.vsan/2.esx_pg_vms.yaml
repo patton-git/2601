@@ -98,7 +98,7 @@
       password: "{{ vcenter_password }}"
       datacenter: "{{ datacenter_name }}"
       folder: "{{ parent_folder }}{{ item.id }}"
-      name: "{{student_id}}-vSAN-VCSA"
+      name: "{{ item.id }}-vSAN-VCSA"
       state: present
       snapshot_name: "{{ snapshot_name }}"
     loop: "{{ LAB_SID }}"    
