@@ -98,8 +98,8 @@
       password: "{{ vcenter_password }}"
       validate_certs: no
       datacenter: "{{ datacenter_name }}"
-      folder: "{{ parent_folder }}{{ item[0].id }}"
-      name: "{{ item[0].id }}-vSAN-VCSA"
+      folder: "{{ parent_folder }}{{ item.id }}"
+      name: "{{ item.id }}-vSAN-VCSA"
       state: present
       snapshot_name: "{{ snapshot_name }}"
     loop: "{{ LAB_SID }}"    
